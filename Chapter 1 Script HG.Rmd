@@ -55,6 +55,9 @@ library(ggcorrplot)
 library(pheatmap)
 #install.packages("PerformanceAnalytics")
 library(PerformanceAnalytics)
+library(survival)
+library(survminer)
+library(GGally)
 
 ```
 
@@ -109,28 +112,9 @@ cohort_labels <- c(
 )
 
 sex_labels<- c(
-  "M" = "Male"
+  "M" = "Male",
   "F" = "Female"
 )
-
-```
-
-#finding out the eclosion range for each cohort 
-```{r, eclosion rnages for each cohort}
-eclosion_1 <- data_mon %>%
-  filter(Cohort == 1) %>%
-  summarize(min_date = min(Date.of.eclosion, na.rm = TRUE),
-            max_date = max(Date.of.eclosion, na.rm = TRUE))
-
-eclosion_2 <- data_mon %>%
-  filter(Cohort == 2) %>%
-  summarize(min_date = min(Date.of.eclosion, na.rm = TRUE),
-            max_date = max(Date.of.eclosion, na.rm = TRUE))
-
-eclosion_3 <- data_mon %>%
-  filter(Cohort == 3) %>%
-  summarize(min_date = min(Date.of.eclosion, na.rm = TRUE),
-            max_date = max(Date.of.eclosion, na.rm = TRUE))
 
 ```
 
@@ -147,8 +131,11 @@ summary(model_growth)
 kable(summary(model_growth)$tTable)
 
 #Run and Anova
-anova(model_growth)
-
+#anova(model_growth)
+anova(model_growth, type="marginal")
+#Anova(model_growth, type= "II")
+#Anova(model_growth, type= "III")
+#don't understand why the type 3 anova won't work for this one 
 
 # Perform Tukey post-hoc test
 # Get the estimated marginal means
@@ -161,6 +148,7 @@ kable(summary(tukey_results_growth)$Table)
 
 ```
 
+###Figure 1A
 ##Graphing for growth rate
 ```{r, growth rate figure}
 #making predictions
@@ -219,9 +207,70 @@ growth_plot<- ggplot(growth_pred_summary, aes(x = treatment, y = 1000 * emmean, 
   )
 
 
+#now inlcuding some raw jittered points 
+
+growth_plot <- ggplot(growth_pred_summary, aes(x = treatment, y = 1000 * emmean, color = Species)) +
+  
+  # Raw data points (behind)
+  geom_jitter(
+    data = data_mon,
+    aes(x = treatment, y = 1000 * growth.rate, color = Species),
+    alpha = 0.2,             # transparency for visibility behind means
+    size = 1.8,              # small circles
+    shape = 16,              # filled circles
+    position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.5)
+  ) +
+  
+  # Mean points
+  geom_point(size = 4, position = position_dodge(width = 0.5)) +
+  
+  # Lines connecting means
+  geom_line(aes(group = Species), position = position_dodge(width = 0.5)) +
+  
+  # Error bars
+  geom_errorbar(
+    aes(ymin = 1000 * lower.CL, ymax = 1000 * upper.CL),
+    width = 0.1,
+    position = position_dodge(width = 0.5)
+  ) +
+  
+  # Custom colors for species
+  scale_color_manual(
+    name = "Species",
+    values = c("inc" = "deepskyblue4", "syr" = "red3"),
+    labels = c(expression(italic("A. incarnata")),
+               expression(italic("A. syriaca")))
+  ) +
+  
+  # Axis labels
+  ylab(expression(paste("Growth rate (mg/day)"))) +
+  xlab("Light treatment") +
+  scale_x_discrete(labels = c("ML" = "Control", "AL" = "ALAN")) +
+  
+  # Y-axis zoom
+  coord_cartesian(ylim = c(5, 30)) +
+  
+  labs(tag = "A") +
+  
+  # Plot aesthetics
+  theme_bw(base_size = 16) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.line.y.right = element_blank(),
+    axis.line.x.top = element_blank(),
+      legend.position = c(0.3, 0.93),
+    plot.tag.position = c(0.02, 0.98),
+    plot.tag = element_text(size = 18)
+  )
+
+
+growth_plot
 ```
 
-##larval duration as a function of alan
+##larval duration as a function of ALAN
 ```{r, model larval duration, and post hoc testing and plot}
 #no signficiant interactions 
 
@@ -233,10 +282,14 @@ model_larvalduration <- lme(Larval_duration ~ treatment + Sex + Cohort + Species
 summary(model_larvalduration)
 kable(summary(model_larvalduration)$tTable)
 
-
+anova(model_larvalduration, type="marginal")
 #Run and Anova
-Anova(model_larvalduration, type= "III")
+#Anova(model_larvalduration, type= "III")
 
+#Anova(model_larvalduration, type= "II")
+
+#Anova(model_larvalduration)
+#anova(model_larvalduration)
 
 # Perform Tukey post-hoc test
 # Get the estimated marginal means
@@ -248,6 +301,7 @@ print(tukey_results_larvalduration)
 
 ```
 
+###Figure 1B
 ##Larval duration predictions and plot
 ```{r}
 
@@ -307,9 +361,65 @@ larval_duration_plot <- ggplot(larval_pred_summary, aes(x = treatment, y = emmea
     plot.tag = element_text(size = 18)
   )
 
+
+#now with the raw jittered data points 
+larval_duration_plot <- ggplot(larval_pred_summary, aes(x = treatment, y = emmean, color = Species)) +
+    
+  # Raw data points (behind)
+  geom_jitter(
+    data = data_mon,
+    aes(x = treatment, y = Larval_duration, color = Species),
+    alpha = 0.2,             # transparency for visibility behind means
+    size = 1.8,              # small circles
+    shape = 16,              # filled circles
+    position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.5)
+  ) +
+  # Mean points
+  geom_point(size = 4, position = position_dodge(width = 0.5)) +
+  
+  # Lines connecting means
+  geom_line(aes(group = Species), position = position_dodge(width = 0.5)) +
+  
+  # Error bars
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL),
+                width = 0.1, position = position_dodge(width = 0.5)) +
+  
+  # Custom colors for species
+  scale_color_manual(name = "Species",
+                     values = c("inc" = "deepskyblue4", "syr" = "red3"),
+                     labels = c(expression(italic("A. incarnata")),
+                                expression(italic("A. syriaca")))) +
+  
+  # Axis labels
+  ylab(expression(paste("Larval duration (days)"))) +
+  xlab("Light treatment") +
+  scale_x_discrete(labels = c("ML" = "Control", "AL" = "ALAN")) +
+  
+    
+  # Y-axis zoom
+  coord_cartesian(ylim = c(15, 21)) +
+  
+    labs(tag = "B") +
+
+  # Plot aesthetics
+  theme_bw(base_size = 16) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),       
+    axis.line = element_line(color = "black"),  
+    axis.line.y.right = element_blank(),   
+    axis.line.x.top = element_blank(),     
+    legend.position = "none"    , 
+    
+    plot.tag.position = c(0.02, 0.98),
+    plot.tag = element_text(size = 18)
+  )
+
+larval_duration_plot
 ```
 
-##pupal duration as a function of alan
+##pupal duration as a function of ALAN
 ```{r pupal duration model, post hoc, and figure}
 
 #no significant interactions so we will revise the model
@@ -323,6 +433,7 @@ summary(model_pupalduration)
 kable(summary(model_pupalduration)$tTable)
 
 #Run an Anova
+anova(model_pupalduration, type="marginal")
 Anova(model_pupalduration, type= "III")
 
 
@@ -337,6 +448,7 @@ print(tukey_results_pupalduration)
 
 ```
 
+###Figure 1C
 #Predicting pupal duration and plotting it 
 ```{r}
 # Making predictions for pupal duration
@@ -429,16 +541,74 @@ pupal_duration_plot <- ggplot(pupal_pred_summary, aes(x = treatment, y = emmean,
   )
 
 
+#now adding raw jittered data points 
+pupal_duration_plot <- ggplot(pupal_pred_summary, aes(x = treatment, y = emmean, color = Species)) +
+    # Raw data points (behind)
+  geom_jitter(
+    data = data_mon,
+    aes(x = treatment, y = Pupal_duration, color = Species),
+    alpha = 0.2,             # transparency for visibility behind means
+    size = 1.8,              # small circles
+    shape = 16,              # filled circles
+    position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.5)
+  ) +
+  geom_point(size = 4, position = position_dodge(width = 0.5)) +
+  
+  geom_line(aes(group = Species), position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL),
+                width = 0.1, position = position_dodge(width = 0.5)) +
+  scale_color_manual(name = "Species",
+                     values = c("inc" = "deepskyblue4", "syr" = "red3"),
+                     labels = c(expression(italic("A. incarnata")),
+                                expression(italic("A. syriaca")))) +
+  ylab(expression(paste("Pupal duration (days)"))) +
+  xlab("Light treatment") +
+  scale_x_discrete(labels = c("ML" = "Control", "AL" = "ALAN")) +
+  coord_cartesian(ylim = c(11, 17)) +
 
+  labs(tag = "C") +
 
+  theme_bw(base_size = 16) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.line.y.right = element_blank(),
+    axis.line.x.top = element_blank(),
 
+    # Legend positioning and style
+    legend.position = "none",      # bottom right inside plot (x=right, y=bottom)
+    legend.justification = c("right", "bottom"), 
+    legend.background = element_blank(),  # No background (no box)
+    legend.key = element_blank(),         # No key boxes around symbols
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 13),
+
+    plot.tag.position = c(0.02, 0.98),
+    plot.tag = element_text(size = 18)
+  )
+
+pupal_duration_plot
 ```
 
+###Figure 1
 #Putting together growth, larval duration, and pupal duration for Figure 1
 ```{r}
 Figure_1<- growth_plot + larval_duration_plot + pupal_duration_plot
 
-ggsave("Figure_1_chp1.png", plot = Figure_1, width = 11, height = 5, dpi = 300)
+growth_plot <- growth_plot + theme(axis.title.x = element_blank())
+larval_duration_plot <- larval_duration_plot + theme(axis.title.x = element_blank())
+
+# Stack the plots
+Figure_1_alt <- growth_plot / larval_duration_plot / pupal_duration_plot
+
+
+Figure_1_alt<- growth_plot / larval_duration_plot / pupal_duration_plot
+
+ggsave("Figure_1_chp1.png", plot = Figure_1, width = 12, height = 5, dpi = 300)
+
+ggsave("Figure_1_alt.png", plot = Figure_1_alt, width = 5, height = 12, dpi = 300)
 
 ```
 
@@ -456,6 +626,7 @@ summary(model_finalwetmass)
 kable(summary(model_finalwetmass)$tTable)
 
 #Run an anova
+anova(model_finalwetmass, type= "marginal")
 Anova(model_finalwetmass, type= "III")
 
 
@@ -474,6 +645,7 @@ kable(summary(tukey_results_wetmass)$Table)
 
 ```
 
+###Figure 2A
 #Plotting wet mass faceted by cohort
 ```{r}
 
@@ -510,12 +682,12 @@ fresh_mass_plot <- ggplot(fresh_mass_pred, aes(x = treatment, y = 1000 * emmean,
   
   # Manual color for Species
   scale_color_manual(name = "Species",
-                     values = c("inc" = "skyblue3", "syr" = "red3"),
+                     values = c("inc" = "deepskyblue4", "syr" = "red3"),
                      labels = c(expression(italic("A. incarnata")),
                                 expression(italic("A. syriaca")))) +
   
   # Axis labels
-  ylab(expression(paste("Adult wet mass (mg)"))) +
+  ylab(expression(paste("Fresh mass (mg)"))) +
   xlab("Light treatment") +
   labs(tag = "A") +
   scale_x_discrete(labels = c("ML" = "Control", "AL" = "ALAN"))  +
@@ -544,12 +716,80 @@ fresh_mass_plot <- ggplot(fresh_mass_pred, aes(x = treatment, y = 1000 * emmean,
   facet_wrap(~ Cohort, nrow = 1, labeller = labeller(Cohort = cohort_labels))
 
 
+
+
+#plotting fresh mass again but now with the raw jittered data poitns 
+
+fresh_mass_plot <- ggplot(fresh_mass_pred, aes(x = treatment, y = 1000 * emmean, color = Species, group = interaction(Species, Cohort))) +
+    # Raw data points (behind)
+  geom_jitter(
+    data = data_mon,
+    aes(x = treatment, y = 1000 *Adult.wet.mass, color = Species),
+    alpha = 0.2,             # transparency for visibility behind means
+    size = 1.8,              # small circles
+    shape = 16,              # filled circles
+    position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.5)
+  ) +
+  
+  # Line connecting means
+  geom_line(position = position_dodge(width = 0.5)) +
+
+  # Error bars
+  geom_errorbar(aes(ymin = 1000 * lower.CL, ymax = 1000 * upper.CL), 
+                width = 0.1, position = position_dodge(width = 0.5)) +
+  
+  # Mean points
+  geom_point(size = 4, position = position_dodge(width = 0.5)) +
+  
+  # Manual color for Species
+  scale_color_manual(name = "Species",
+                     values = c("inc" = "deepskyblue4", "syr" = "red3"),
+                     labels = c(expression(italic("A. incarnata")),
+                                expression(italic("A. syriaca")))) +
+  
+  # Axis labels
+  ylab(expression(paste("Fresh mass (mg)"))) +
+  labs(x = NULL) +
+  labs(tag = "A") +
+  scale_x_discrete(labels = c("ML" = "Control", "AL" = "ALAN"))  +
+
+  # Clean theme styling
+  theme_bw(base_size = 16) +
+  theme(
+    panel.grid = element_blank(),             # Remove all grid lines
+    panel.border = element_blank(),           # Remove panel border
+    axis.line = element_line(color = "black"),# Add axis lines
+    axis.line.y.right = element_blank(),      # Remove right y-axis
+    axis.line.x.top = element_blank(),        # Remove top x-axis
+    strip.background = element_blank(),       # Clean facet label strip
+    strip.text = element_text(size = 14),
+    legend.position = c(0.15, 0.70),          # Bottom right corner 
+    legend.justification = c("right", "bottom"),
+    legend.background = element_blank(),
+    legend.key = element_blank(),
+    plot.tag = element_text(size = 18)
+     , 
+    
+    plot.tag.position = c(0.02, 0.98),
+  )+
+  
+  # Facet by Cohort in a single row
+  facet_wrap(~ Cohort, nrow = 1, labeller = labeller(Cohort = cohort_labels))
+
+
+
+fresh_mass_plot
+
   
 ```
 
-
 #Total wing surface area 
 ```{r}
+data_mon <- data_mon %>%
+  mutate(Total_wing_area = ifelse(Total_wing_area == 0, NA, Total_wing_area))
+
+
+
 # Fit the model for Total Wing Area
 model_totalwingarea <- lme(Total_wing_area ~ treatment + Sex + Cohort + Species + treatment*Species,
                            random = ~ 1 | CohortCage,
@@ -564,6 +804,7 @@ kable(summary(model_totalwingarea)$tTable)
 
 # Run Type III ANOVA
 Anova(model_totalwingarea, type = "III")
+anova(model_totalwingarea, type="marginal")
 
 # Perform Tukey post-hoc test
 # Get estimated marginal means
@@ -576,7 +817,7 @@ print(tukey_results_totalwingarea)
 
 ```
 
-
+###Figure 2B
 #Predicting and plotting total wing surface area 
 ```{r}
 # 1. Get predicted means
@@ -604,7 +845,7 @@ wing_area_plot <- ggplot(wing_area_pred, aes(x = treatment, y = emmean, color = 
   
   # Manual color for Species
   scale_color_manual(name = "Species",
-                     values = c("inc" = "skyblue3", "syr" = "red3"),
+                values = c("inc" = "deepskyblue4", "syr" = "red3"),
                      labels = c(expression(italic("A. incarnata")),
                                 expression(italic("A. syriaca")))) +
   
@@ -634,21 +875,74 @@ wing_area_plot <- ggplot(wing_area_pred, aes(x = treatment, y = emmean, color = 
     plot.tag = element_text(size = 18)
   )
 
+
+#plotting again now but with the raw data points 
+# 3. Create plot
+wing_area_plot <- ggplot(wing_area_pred, aes(x = treatment, y = emmean, color = Species, group = interaction(Species, Cohort))) +
+geom_jitter(
+  data = dplyr::filter(data_mon, Total_wing_area != 0),
+  aes(x = treatment, y = Total_wing_area, color = Species),
+  alpha = 0.2,
+  size = 1.8,
+  shape = 16,
+  position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.5)
+) +
+  # Line connecting means
+  geom_line(position = position_dodge(width = 0.5)) +
+
+  # Error bars
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                width = 0.1, position = position_dodge(width = 0.5)) +
+  
+  # Mean points
+  geom_point(size = 4, position = position_dodge(width = 0.5)) +
+  
+  # Manual color for Species
+  scale_color_manual(name = "Species",
+                values = c("inc" = "deepskyblue4", "syr" = "red3"),
+                     labels = c(expression(italic("A. incarnata")),
+                                expression(italic("A. syriaca")))) +
+  
+  # Axis labels
+  ylab(expression(paste("Total wing area (mm"^2, ")"))) +
+  xlab("Light treatment") +
+  labs(tag = "B") +
+  scale_x_discrete(labels = c("ML" = "Control", "AL" = "ALAN")) +
+  
+  # Facet by Cohort in a single row with custom labels
+  facet_wrap(~ Cohort, nrow = 1, labeller = labeller(Cohort = cohort_labels)) +
+
+  # Clean theme styling
+  theme_bw(base_size = 16) +
+  theme(
+    panel.grid = element_blank(),
+    panel.border = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.line.y.right = element_blank(),
+    axis.line.x.top = element_blank(),
+    strip.background = element_blank(),
+    strip.text = element_text(size = 14),
+    legend.position = c(0.15, 0.03),
+    legend.justification = c("right", "bottom"),
+    legend.background = element_blank(),
+    legend.key = element_blank(),
+    plot.tag = element_text(size = 18)
+  )
+
+wing_area_plot
+
 ```
 
-
+###Figure 2
 #Putting together fresh wet mass and total wing surface area plots together 
 ```{r}
 
 Figure_2<- fresh_mass_plot / wing_area_plot
 
 # Save the combined plot as a PNG
-ggsave("Figure_2_chp1.png", plot = Figure_2, width = 12, height = 8, dpi = 300)
-
-
+ggsave("Figure_2_chp1.png", plot = Figure_2, width = 13, height = 9, dpi = 300)
 
 ```
-
 
 #Dry mass model 
 ```{r}
@@ -663,7 +957,9 @@ summary(model_finaldrymass)
 kable(summary(model_finaldrymass)$tTable)
 
 # Run a Type III ANOVA
-Anova(model_finaldrymass, type = "III")
+anova(model_finaldrymass, type= "marginal")
+#Anova(model_finaldrymass, type = "III")
+#don't know why I am getting an error for this 
 
 # Perform Tukey post-hoc test
 # Get the estimated marginal means
@@ -678,7 +974,7 @@ kable(summary(tukey_results_drymass)$summary)
 
 ```
 
-
+###Figure 3A
 #correlation between fresh and dry mass 
 ```{r}
 
@@ -687,6 +983,8 @@ model_drymass <- lm(Adult.dry.mass ~ Adult.wet.mass * treatment + Sex + Species 
 
 # Summary of the model
 summary(model_drymass)
+print(summary(model_drymass), digits = 4)
+
 
 # Optionally format the summary with kable
 library(knitr)
@@ -701,30 +999,67 @@ means <- data_mon %>%
   )
 
 #Time to plot
-ggplot(data_mon, aes(x = Adult.wet.mass*1000, y = Adult.dry.mass*1000, color = treatment)) +
-  geom_jitter(width = 0.1, height = 0.1, size = 2, alpha = 0.7) +  # jitter points
-  scale_color_manual(values = c("ML" = "royalblue4", "AL" = "goldenrod1")) +
-  
-  # Add regression lines per treatment
-  geom_smooth(method = "lm", se = FALSE, size = 1) +
-  
+fresh_dry_plot <- ggplot(data_mon,
+                         aes(x = Adult.wet.mass*1000,
+                             y = Adult.dry.mass*1000,
+                             color = treatment)) +
+  geom_jitter(width = 0.1, height = 0.1, size = 1.8, alpha = 0.4) +
+  scale_color_manual(name = "Light treatment",
+                     values = c("ML" = "#004B74", "AL" = "#E69F00")
+,
+                     labels = c("Control", "ALAN")) +
+geom_smooth(aes(color = treatment), method = "lm", se = FALSE, size = 1,
+            linetype = "solid") +
   labs(
-    x = "Fresh Mass (mg)",
-    y = "Dry Mass (mg)",
+    x = "Fresh mass (mg)",
+    y = "Dry mass (mg)",
     color = "Treatment"
   ) +
+    labs(tag = "A") +
   
   theme_minimal() +
   theme(
-    legend.position = "right",
+    legend.position = c(0.3, 0.9),,
     text = element_text(size = 14),
-    panel.grid = element_blank(),               # remove grid lines
-    axis.line = element_line(color = "black", size = 0.8)  # black axes lines
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "black", size = 0.8)
   )
 
 
-```
+fresh_dry_plot
 
+#modifying the axis point 
+fresh_dry_plot <- ggplot(data_mon,
+                         aes(x = Adult.wet.mass*1000,
+                             y = Adult.dry.mass*1000,
+                             color = treatment)) +
+  geom_jitter(width = 0.1, height = 0.1, size = 1.8, alpha = 0.4) +
+  scale_color_manual(
+    name = "Light treatment",
+    values = c("ML" = "#004B74", "AL" = "#E69F00"),
+    labels = c("Control", "ALAN")
+  ) +
+  geom_smooth(aes(color = treatment), method = "lm", se = FALSE,
+              size = 1, linetype = "solid") +
+  labs(
+    x = "Fresh mass (mg)",
+    y = "Dry mass (mg)"
+  ) +
+  labs(tag = "A") +
+scale_x_continuous(
+  limits = c(310, NA),                 # 👈 x-axis starts at 350
+  expand = expansion(mult = c(0, 0.02))  # optional small padding
+) +
+
+  theme_minimal() +
+  theme(
+    legend.position = c(0.28, 0.91),
+    text = element_text(size = 14),
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "black", size = 0.8)
+  )
+
+```
 
 #Forewing length model
 ```{r}
@@ -739,6 +1074,7 @@ kable(summary(model_length)$tTable)
 
 
 # Run a Type III ANOVA
+anova(model_length, type="marginal")
 Anova(model_length, type = "III")
 
 # Perform Tukey post-hoc test
@@ -755,7 +1091,7 @@ kable(summary(tukey_results_length)$summary)
 
 ```
 
-
+###Figure 3B
 #Predicting and plotting for forewing length 
 ```{r}
 forewing_pred <- emmeans(model_length, specs = c("treatment", "Species")) %>%
@@ -772,12 +1108,23 @@ forewing_pred_summary <- forewing_pred %>%
 
 
 length_plot<- ggplot(forewing_pred_summary, aes(x = Species, y = emmean, group = treatment)) + 
+      # Raw data points (behind)
+  geom_jitter(
+    data = data_mon,
+    aes(x = Species, y = Forewing_length_mm, color = Treatment),
+    alpha = 0.2,             # transparency for visibility behind means
+    size = 1.8,              # small circles
+    shape = 16,              # filled circles
+    position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.5)
+  ) +
+  
   geom_line(position = position_dodge(width = 0.5)) +
   geom_point(aes(color = treatment), size = 3, position = position_dodge(width = 0.5)) +
   geom_errorbar(aes(ymax = upper.CL, ymin = lower.CL, color = treatment), 
                 width = 0.1, position = position_dodge(width = 0.5)) +
   scale_color_manual(name = "Light treatment",
-                     values = c("ML" = "royalblue4", "AL" = "goldenrod1"),
+                     values = c("ML" = "#004B74", "AL" = "#E69F00")
+,
                      labels = c("Control", "ALAN")) +
   ylab(expression(paste("Forewing length (mm)"))) +
   xlab("Species") +
@@ -791,18 +1138,26 @@ length_plot<- ggplot(forewing_pred_summary, aes(x = Species, y = emmean, group =
     axis.line = element_line(color = "black"),
     axis.line.x.top = element_blank(),        # Remove top x-axis
     axis.line.y.right = element_blank(),      # Remove right y-axis
-    legend.position = c(0.04, 0.97),          # Top-left corner
+    legend.position = "none",          # Top-left corner
     legend.justification = c("left", "top"),
     legend.background = element_blank(),      # No outline
     legend.key = element_blank(),
     plot.tag = element_text(size = 16)
   )
 
+length_plot
+#made sure to use color blind friendly color scale 
+
+
 ```
 
 
 #Wing loading 
 ```{r}
+data_mon <- data_mon %>%
+  mutate(Wingloading = ifelse(Wingloading == 0, NA, Wingloading))
+
+
 # Fit the model for Wingloading
 model_wingloading <- lme(Wingloading ~ treatment + Sex + Cohort + Species,
                          random = ~ 1 | CohortCage,
@@ -814,6 +1169,7 @@ summary(model_wingloading)
 kable(summary(model_wingloading)$tTable)
 
 # Run Type III ANOVA
+anova(model_wingloading, type = "marginal")
 Anova(model_wingloading, type = "III")
 
 # Perform Tukey post-hoc test
@@ -827,7 +1183,7 @@ print(tukey_results_wingloading)
 
 ```
 
-
+###Figure 3C
 #Plotting wing loading 
 ```{r}
 wingload_pred <- emmeans(model_wingloading, specs = ~ treatment + Cohort) %>%
@@ -841,41 +1197,62 @@ wingload_pred_summary <- wingload_pred %>%
             upper.CL = mean(upper.CL))
 
 
-ggplot(wingload_pred_summary, aes(x = Cohort, y = emmean, group = treatment)) + 
-  geom_line(position = position_dodge(width = 0.5)) +
-  geom_point(aes(color = treatment), size = 3, position = position_dodge(width = 0.5)) +
-  geom_errorbar(aes(ymax = upper.CL, ymin = lower.CL, color = treatment), 
-                width = 0.1, position = position_dodge(width = 0.5)) +
-  scale_color_manual(name = "Light treatment",
-                     values = c("ML" = "royalblue4", "AL" = "goldenrod1"),
-                     labels = c("Control", "ALAN")) +
-  ylab(expression(paste("Wing loading (mg/mm"^2, ")"))) +
-  xlab("Cohort") +
-  labs(tag = "C") +
-  scale_x_discrete(labels = c(cohort_labels)) +  # ✅ Fixed this line
-  theme_bw(base_size = 16) +
-  theme(
-    panel.grid = element_blank(),
-    panel.border = element_blank(),
-    axis.line = element_line(color = "black"),
-    axis.line.x.top = element_blank(),
-    axis.line.y.right = element_blank(),
-    legend.position = c(0.04, 0.97),
-    legend.justification = c("left", "top"),
-    legend.background = element_blank(),
-    legend.key = element_blank(),
-    plot.tag = element_text(size = 16)
-  )
+wingloading_plot<- ggplot(wingload_pred_summary, aes(x = Cohort, y = emmean, group = treatment)) + 
+    geom_jitter(
+      data = data_mon,
+      aes(x = Cohort, y = Wingloading, color = Treatment),
+      alpha = 0.2,
+      size = 1.8,
+      shape = 16,
+      position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.5)
+    ) +
+    geom_line(position = position_dodge(width = 0.5)) +
+    geom_point(aes(color = treatment), size = 3, position = position_dodge(width = 0.5)) +
+    geom_errorbar(aes(ymax = upper.CL, ymin = lower.CL, color = treatment),
+                  width = 0.1, position = position_dodge(width = 0.5)) +
+    scale_color_manual(name = "Light treatment",
+                       values = c("ML" = "#004B74", "AL" = "#E69F00"),
+                       labels = c("Control", "ALAN")) +
+    ylab(expression(paste("Wing loading (mg/mm"^2, ")"))) +
+    xlab("Cohort") +
+    labs(tag = "C") +
+    
+    # ✅ REMOVE 0 LABEL
+  scale_y_continuous(
+  labels = function(x) ifelse(x == 0, "", x),
+  expand = expansion(mult = c(0.05, 0.15))  # 5% bottom, 15% top padding
+) +
 
+    theme_bw(base_size = 16) +
+    theme(
+      panel.grid = element_blank(),
+      panel.border = element_blank(),
+      axis.line = element_line(color = "black"),
+      axis.line.x.top = element_blank(),
+      axis.line.y.right = element_blank(),
+      legend.position = "none",
+      legend.justification = c("left", "top"),
+      legend.background = element_blank(),
+      legend.key = element_blank(),
+      plot.tag = element_text(size = 16)
+    )
 
-
-
+wingloading_plot
 #plotting it to see what it would be like if we plotted based on species 
 
 
 
 ```
 
+###Figure 3
+#putting together Figure 3 
+```{r}
+Figure_3<- fresh_dry_plot + length_plot + wingloading_plot
+
+ggsave("Figure_3_chp1.png", plot = Figure_3, width = 13, height = 5, dpi = 300)
+
+
+```
 
 #Path analysis 
 ```{r}
@@ -929,7 +1306,6 @@ summary(fit, fit.measures = TRUE, standardized = TRUE)
 
 ```
 
-
 #Kaplan Survival Curve
 ```{r}
 # Calculate survival time in days
@@ -976,198 +1352,162 @@ ggsave("survival_plot_with_risktable.png",
 survdiff(surv_object ~ treatment, data = data_mon)
 ```
 
-#survival according to host plant
+### Figure S5
+#correlation plot 
 ```{r}
-library(survival)
-library(survminer)
-
-data_mon$Species <- factor(data_mon$Species, levels = c("incarnata", "syriaca"))
-data_mon$treatment <- factor(data_mon$treatment, levels = c("Control", "ALAN"))
+data_ML %>%
+  dplyr::select (c(growth.rate, Larval_duration, Pupal_duration, Adult.wet.mass, Total_wing_area)) %>%
+  ggpairs()
 
 
-data_mon$group <- interaction(data_mon$treatment, data_mon$Species)
+data_mon <- data_mon %>%
+  mutate(Treatment = factor(Treatment, levels = c("ML", "AL")))
 
 
-# Create survival object
-surv_object <- Surv(time = data_mon$survival_time, event = data_mon$event)
-km_fit <- survfit(surv_object ~ group, data = data_mon)
+sup_fig<- data_mon %>%
+  dplyr::select(
+    Treatment,
+    growth.rate,
+    Larval_duration,
+    Pupal_duration,
+    Adult.wet.mass,
+    Total_wing_area
+  ) %>%
+  # Rename columns
+  dplyr::rename(
+    `Light treatment` = Treatment,
+    `Growth rate` = growth.rate,
+    `Larval duration` = Larval_duration,
+    `Pupal duration` = Pupal_duration,
+    `Fresh mass` = Adult.wet.mass,
+    `Total wing area` = Total_wing_area
+  ) %>%
+  # Rename treatment levels
+  mutate(`Light treatment` = factor(`Light treatment`, 
+                                    levels = c("ML", "AL"),
+                                    labels = c("Control", "ALAN"))) %>%
+  ggpairs(
+    aes(color = `Light treatment`, fill = `Light treatment`),
+    upper = list(continuous = "cor"),             # correlation numbers
+    lower = list(continuous = wrap("points", alpha = 0.5)),  # transparent points
+    diag  = list(continuous = wrap("densityDiag", alpha = 0.5)) # transparent densities
+  ) +
+  scale_color_manual(values = c("Control" = "#004B74", "ALAN" = "#FFD500")) +
+  scale_fill_manual(values = c("Control" = "#004B74", "ALAN" = "#FFD500")) +
+  theme_bw() +
+  theme(panel.grid = element_blank())+
+  # Make correlation numbers match treatment colors
+  ggplot2::theme(
+    strip.text = element_text(color = "black")
+  )
 
-
-# Fit Kaplan-Meier model stratified by Species
-km_fit_species <- survfit(surv_object ~ Species + treatment, data = data_mon)
-
-# Plot faceted by treatment, color by species
-survival_facet_plot <- ggsurvplot_facet(
-  km_fit_species,
-  data = data_mon,
-  facet.by = "treatment",         # Facet panels by treatment
-  color = "Species",              # Color lines by species
-  palette = c("inc" = "blue", "syr" = "red"),  # Custom species colors
-  pval = TRUE,
-  conf.int = TRUE,
-  risk.table = TRUE,
-  xlab = "Days",
-  ylab = "Survival Probability",
-  legend.title = "Species"
-)
-
-
-
-```
-
-#survival
-```{r, Kaplan Survival Curve for monarchs reared on incarnata}
-# Filter data for A. incarnata only
-data_incar <- data_mon %>% filter(Species == "inc")
-
-# Calculate survival time
-data_incar$survival_time <- as.numeric(difftime(data_incar$Date.of.death, data_incar$Hatch.Date, units = "days"))
-
-# Create event indicator (assuming death is coded as 1 and censoring as 0)
-data_incar$event <- ifelse(!is.na(data_incar$Date.of.death), 1, 0)
-
-# Create survival object
-surv_object_incar <- Surv(time = data_incar$survival_time, event = data_incar$event)
-
-# Fit Kaplan-Meier survival curve by treatment
-km_fit_incar <- survfit(surv_object_incar ~ treatment, data = data_incar)
-
-# Plot Kaplan-Meier curves
-ggsurvplot(
-  km_fit_incar, 
-  data = data_incar,
-  pval = TRUE,                # Show p-value for log-rank test
-  conf.int = TRUE,            # Show confidence interval
-  risk.table = TRUE,          # Display risk table
-  xlab = "Days",
-  ylab = "Survival Probability on A. incarnata",
-  legend.title = "Treatment",
-  legend.labs = c("AL", "ML"),  # Customize legend labels
-  palette = c("yellow3", "navy") # Set colors for AL and ML
-)
-
-# Log-rank test for treatment differences
-survdiff(surv_object_incar ~ treatment, data = data_incar)
-
+ggsave("sup_fig.png", plot = sup_fig, width = 12, height = 7, dpi = 300)
 ```
 
 
-```{r, survival}
-# Filter data for A. syriaca only
-data_syri <- data_mon %>% filter(Species == "syr")
-
-# Calculate survival time
-data_syri$survival_time <- as.numeric(difftime(data_syri$Date.of.death, data_syri$Hatch.Date, units = "days"))
-
-
-
-# Create event indicator (assuming death is coded as 1 and censoring as 0)
-data_syri$event <- ifelse(!is.na(data_syri$Date.of.death), 1, 0)
-
-# Create survival object
-surv_object_syri <- Surv(time = data_syri$survival_time, event = data_syri$event)
-
-# Fit Kaplan-Meier survival curve by treatment
-km_fit_syri <- survfit(surv_object_syri ~ treatment, data = data_syri)
-
-# Plot Kaplan-Meier curves
-ggsurvplot(
-  km_fit_syri, 
-  data = data_syri,
-  pval = TRUE,                # Show p-value for log-rank test
-  conf.int = TRUE,            # Show confidence interval
-  risk.table = TRUE,          # Display risk table
-  xlab = "Days",
-  ylab = "Survival Probability on A. syriaca",
-  legend.title = "Treatment",
-  legend.labs = c("AL", "ML"),  # Customize legend labels
-  palette = c("yellow3", "navy") # Set colors for AL and ML
-)
-
-# Log-rank test for treatment differences
-survdiff(surv_object_syri ~ treatment, data = data_syri)
-
-```
-
-
-#Correlation plots to add to the supplementary
+###Figure S6
+#looking at caterpillar location 
 ```{r}
-#try to merge the data_mon data set with the cardenolide data set
 
-#making a correltation matrix
-cormat<- cor(data_mon [ , c("Adult.wet.mass", "Larval_duration", "Pupal_duration", "growth.rate", "Adult.wet.mass", "Total_wing_area")], use= "pairwise.complete.obs")
+# load location data 
+location_data<- read_sheet("https://docs.google.com/spreadsheets/d/19eTdjvJmQ6QqMTdKgQp42JZcs2Znglq00gkSpDcbC5I/edit?gid=0#gid=0")
 
-corrplot::corrplot(cormat)
-cor()
 
-cormat_2 <- cor(data_mon[, c("Adult.wet.mass", "Larval_duration", "Pupal_duration", "growth.rate", "Total_wing_area")], use = "pairwise.complete.obs")
-ggcorrplot(cormat_2, 
-           method = "circle",      # or "square"
-           type = "lower",         # show lower triangle only
-           lab = TRUE,             # add correlation coefficients
-           lab_size = 3,
-           colors = c("red", "white", "green"))
+location_data <- location_data[, !(names(location_data) %in% "Time")]
 
 
 
-#different ways to visualize all of the different correlations
-pheatmap(cormat_2, 
-         display_numbers = TRUE, 
-         color = colorRampPalette(c("red", "white", "green"))(50),
-         clustering_method = "complete")
-
-chart.Correlation(data_mon[, c("Adult.wet.mass", "Larval_duration", "Pupal_duration", "growth.rate", "Total_wing_area")], 
-                  histogram=TRUE, 
-                  pch=19)
-
-pairs(data_mon[, c("Adult.wet.mass", "Larval_duration", "Pupal_duration", "growth.rate", "Total_wing_area")],
-      panel = function(x, y) {
-          points(x, y)
-          usr <- par("usr"); on.exit(par(usr))
-          par(usr = c(0, 1, 0, 1))
-          r <- cor(x, y, use = "pairwise.complete.obs")
-          text(0.5, 0.5, formatC(r, digits=2, format="f"), cex = 1.5)
-      })
-
-```
+data_mon_small <- data_mon %>%
+  filter(Cohort == 1) %>%      # keep only Cohort 1
+  dplyr::select(
+    Individual, Treatment, Cohort, Cage, Species,
+    Day.7.date, Day.7.node, Day.7.avaiable.nodes,
+    Ratio.location, Day.7.Leaf.orientation
+  )
 
 
-```{r, old path analysis, do not use anymore}
+combined_data <- data_mon %>%
+  dplyr::select(
+    Individual, Treatment, Cohort, Cage, Species,
+    Day.7.date, Day.7.node, Day.7.avaiable.nodes,
+    Ratio.location, Day.7.Leaf.orientation
+  ) %>%
+  left_join(location_data, by = "Individual") %>%
+  mutate(
+    Observation_type = if_else(is.na(Observation_type), "Afternoon", Observation_type)
+  )
 
-path_diagram_2 <- '
-  # Regressions
-  growth.rate ~ a1*treatment + mstatus_Group_3_4 + Species_syr + Sex_M
-  Larval_duration ~ b1*growth.rate + a2*treatment + mstatus_Group_3_4 + Species_syr + Sex_M
-  Pupal_duration ~ b2*growth.rate + b3*Larval_duration + a3*treatment + mstatus_Group_3_4 + Species_syr + Sex_M
-  Adult.wet.mass ~ b4*growth.rate + b5*Larval_duration + b6*Pupal_duration + a4*treatment + mstatus_Group_3_4 + Species_syr + Sex_M
-  Total_wing_area ~ b7*growth.rate + b8*Larval_duration + b9*Pupal_duration + b10*Adult.wet.mass + a5*treatment + mstatus_Group_3_4 + Species_syr + Sex_M
-
-  # Indirect effects
-  ind_growth_Larval := a1 * b1
-  ind_growth_Pupal := a1 * b2
-  ind_growth_Adult := a1 * b4
-  ind_growth_Wing := a1 * b7
-  ind_growth_larval_pupal := a1 * b1 * b3
-'
-
-fit_2 <- sem(path_diagram_2, data = data_mon_path, se = "bootstrap", bootstrap = 1000, missing = "ML")
-summary(fit_2, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE)
-
-
-# Capture the summary as text
-summary_text <- capture.output(summary(fit_2, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE))
-
-# Extract estimates
-sem_params <- model_parameters(fit_2, standardize = TRUE)
-
-# Convert to flextable and write to Word
-ft <- flextable(sem_params)
-save_as_docx(ft, path = "sem_clean_output.docx")
-
-#the best way to minimize na's without g etting rid of too much data 
-#fit <- sem(path_diagram, data = data_mon_path, missing = "ML")
+combined_data <- dplyr::select(combined_data,
+  -`Day.7.node.y`,
+  -`Cohort.y`,
+  -`Species.y`,
+  -`Cage.y`,
+  -`Treatment.y`,
+  -`Day.7.Leaf.orientation.y`
+) %>%
+  # rename the .x columns to clean names
+  rename(
+    Day.7.node = `Day.7.node.x`,
+    Cohort = `Cohort.x`,
+    Cage = `Cage.x`,
+    Species = `Species.x`,
+    Treatment = `Treatment.x`,
+    Day.7.Leaf.orientation = `Day.7.Leaf.orientation.x`
+  ) %>%
+    mutate(Day.7.node = as.numeric(Day.7.node))
 
 
+# Calculate summary stats (mean and SE)
+summary_data <- combined_data %>%
+  group_by(Observation_type, Treatment) %>%
+  summarise(
+    mean_node = mean(Day.7.node, na.rm = TRUE),
+    se_node   = sd(Day.7.node, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  )
+
+library(ggplot2)
+
+
+
+
+cat_location_plot<- ggplot(combined_data, aes(x = factor(Observation_type, levels = c("Dawn", "Afternoon", "Dusk")), 
+                          y = Day.7.node, color = Treatment)) +
+  # Raw data points, jittered to match mean/error bars
+  geom_jitter(aes(color = Treatment), 
+              position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.3), 
+              alpha = 0.5, size = 2) +
+  # Mean points
+  geom_point(data = summary_data, 
+             aes(x = factor(Observation_type, levels = c("Dawn", "Afternoon", "Dusk")), 
+                 y = mean_node, color = Treatment), 
+             position = position_dodge(width = 0.3), size = 3) +
+  # Error bars for SE
+  geom_errorbar(data = summary_data, 
+                aes(x = factor(Observation_type, levels = c("Dawn", "Afternoon", "Dusk")), 
+                    y = mean_node, ymin = mean_node - se_node, ymax = mean_node + se_node, color = Treatment),
+                position = position_dodge(width = 0.3), width = 0.2) +
+  # Flip Y-axis
+  scale_y_reverse() +
+  # Custom colors
+  scale_color_manual(name = "Light treatment",
+                     values = c("ML" = "#004B74", "AL" = "#E69F00"),
+                     labels = c("Control", "ALAN")) +
+  labs(
+    x = "Time of day",
+    y = "Caterpillar location (nodes from the top)",
+    color = "Treatment"
+  ) +
+  theme_classic() +
+  theme(
+    text = element_text(size = 14),
+    legend.position = c(0.04, 0.04),   # bottom-left corner
+    legend.justification = c(0, 0),    # anchor legend by bottom-left
+    legend.background = element_rect(fill = "transparent") # optional: make background transparent
+  )
+
+
+ggsave("cat_location_plot.png", plot = cat_location_plot, width = 8, height = 5, dpi = 300)
 
 ```
 
